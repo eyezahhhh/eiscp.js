@@ -52,9 +52,9 @@ function eiscp_packet(data) {
 function eiscp_packet_extract(packet) {
     /*
       Exracts message from eISCP packet
-      Strip first 18 bytes and last 3 since that's only the header and end characters
+      Strip first 18 bytes and last 2 since that's only the header and end characters
     */
-    return packet.toString('ascii', 18, packet.length - 3);
+    return packet.toString('ascii', 18, packet.length - 2);
 }
 
 function iscp_to_command(iscp_message) {
@@ -96,18 +96,18 @@ function command_to_iscp(command, args, zone) {
     var base, parts, prefix, value, i, len, intranges,
         default_zone = 'main';
 
-	function parse_command(cmd) {
-		// Splits and normalizes command into 3 parts: { zone, command, value }
-		// Split by space, dot, equals and colon
-		var parts = cmd.toLowerCase().split(/[\s\.=:]/).filter(function (item) { return item !== ''; });
-		if (parts.length < 2 || parts.length > 3) { return false; }
-		if (parts.length === 2) { parts.unshift("main"); }
-		return {
-			zone: parts[0],
-			command: parts[1],
-			value: parts[2]
-		};
-	}
+    function parse_command(cmd) {
+        // Splits and normalizes command into 3 parts: { zone, command, value }
+        // Split by space, dot, equals and colon
+        var parts = cmd.toLowerCase().split(/[\s\.=:]/).filter(function (item) { return item !== ''; });
+        if (parts.length < 2 || parts.length > 3) { return false; }
+        if (parts.length === 2) { parts.unshift("main"); }
+        return {
+            zone: parts[0],
+            command: parts[1],
+            value: parts[2]
+        };
+    }
 
     function in_intrange(number, range) {
         var parts = range.split(',');
@@ -118,15 +118,15 @@ function command_to_iscp(command, args, zone) {
     // If parts are not explicitly given - parse the command
     if (typeof args === 'undefined' && typeof zone === 'undefined') {
 
-		parts = parse_command(command);
-		if(!parts) {
-			// Error parsing command
-			self.emit('error', util.format("ERROR (cmd_parse_error) Command and arguments provided could not be parsed (%s)", command));
-			return;
-		}
-		zone = parts.zone;
-		command = parts.command;
-		args = parts.value;
+        parts = parse_command(command);
+        if (!parts) {
+            // Error parsing command
+            self.emit('error', util.format("ERROR (cmd_parse_error) Command and arguments provided could not be parsed (%s)", command));
+            return;
+        }
+        zone = parts.zone;
+        command = parts.command;
+        args = parts.value;
     }
 
     self.emit('debug', util.format('DEBUG (command_to_iscp) Zone: %s | Command: %s | Argument: %s', zone, command, args));
@@ -166,7 +166,7 @@ function command_to_iscp(command, args, zone) {
 
             // Convert decimal number to hexadecimal since receiver doesn't understand decimal
             value = (+value).toString(16).toUpperCase();
-			// Pad value if it is not 2 digits
+            // Pad value if it is not 2 digits
             value = (value.length < 2) ? '0' + value : value;
 
         } else {
@@ -228,41 +228,41 @@ self.discover = function () {
     }
 
     client
-	.on('error', function (err) {
-        self.emit('error', util.format("ERROR (server_error) Server error on %s:%s - %s", options.address, options.port, err));
-        client.close();
-        callback(err, null);
-    })
-	.on('message', function (packet, rinfo) {
-        var message = eiscp_packet_extract(packet),
-            command = message.slice(0, 3),
-            data;
-        if (command === 'ECN') {
-            data = message.slice(3).split('/');
-            result.push({
-                host:     rinfo.address,
-                port:     data[1],
-                model:    data[0],
-                mac:      data[3].slice(0, 12), // There's lots of null chars after MAC so we slice them off
-                areacode: data[2]
-            });
-            self.emit('debug', util.format("DEBUG (received_discovery) Received discovery packet from %s:%s (%j)", rinfo.address, rinfo.port, result));
-            if (result.length >= options.devices) {
-                clearTimeout(timeout_timer);
-                close();
+        .on('error', function (err) {
+            self.emit('error', util.format("ERROR (server_error) Server error on %s:%s - %s", options.address, options.port, err));
+            client.close();
+            callback(err, null);
+        })
+        .on('message', function (packet, rinfo) {
+            var message = eiscp_packet_extract(packet),
+                command = message.slice(0, 3),
+                data;
+            if (command === 'ECN') {
+                data = message.slice(3).split('/');
+                result.push({
+                    host: rinfo.address,
+                    port: data[1],
+                    model: data[0],
+                    mac: data[3].slice(0, 12), // There's lots of null chars after MAC so we slice them off
+                    areacode: data[2]
+                });
+                self.emit('debug', util.format("DEBUG (received_discovery) Received discovery packet from %s:%s (%j)", rinfo.address, rinfo.port, result));
+                if (result.length >= options.devices) {
+                    clearTimeout(timeout_timer);
+                    close();
+                }
+            } else {
+                self.emit('debug', util.format("DEBUG (received_data) Recevied data from %s:%s - %j", rinfo.address, rinfo.port, message));
             }
-        } else {
-            self.emit('debug', util.format("DEBUG (received_data) Recevied data from %s:%s - %j", rinfo.address, rinfo.port, message));
-        }
-    })
-	.on('listening', function () {
-        client.setBroadcast(true);
-        var buffer = eiscp_packet('!xECNQSTN');
-        self.emit('debug', util.format("DEBUG (sent_discovery) Sent broadcast discovery packet to %s:%s", options.address, options.port));
-        client.send(buffer, 0, buffer.length, options.port, options.address);
-        timeout_timer = setTimeout(close, options.timeout * 1000);
-    })
-    .bind(0);
+        })
+        .on('listening', function () {
+            client.setBroadcast(true);
+            var buffer = eiscp_packet('!xECNQSTN');
+            self.emit('debug', util.format("DEBUG (sent_discovery) Sent broadcast discovery packet to %s:%s", options.address, options.port));
+            client.send(buffer, 0, buffer.length, options.port, options.address);
+            timeout_timer = setTimeout(close, options.timeout * 1000);
+        })
+        .bind(0);
 };
 
 self.connect = function (options) {
@@ -279,12 +279,12 @@ self.connect = function (options) {
     var connection_properties;
 
     options = options || {};
-	config.host = options.host || config.host;
-	config.port = options.port || config.port;
-	config.model = options.model || config.model;
-	config.reconnect = (options.reconnect === undefined) ? config.reconnect : options.reconnect;
-	config.reconnect_sleep = options.reconnect_sleep || config.reconnect_sleep;
-	config.verify_commands = (options.verify_commands === undefined) ? config.verify_commands : options.verify_commands;
+    config.host = options.host || config.host;
+    config.port = options.port || config.port;
+    config.model = options.model || config.model;
+    config.reconnect = (options.reconnect === undefined) ? config.reconnect : options.reconnect;
+    config.reconnect_sleep = options.reconnect_sleep || config.reconnect_sleep;
+    config.verify_commands = (options.verify_commands === undefined) ? config.verify_commands : options.verify_commands;
 
     connection_properties = {
         host: config.host,
@@ -304,7 +304,7 @@ self.connect = function (options) {
 
     // If host is configured but no model is set - we send a discover directly to this receiver
     if (typeof config.model === 'undefined' || config.model === '') {
-        self.discover({address: config.host}, function (err, hosts) {
+        self.discover({ address: config.host }, function (err, hosts) {
             if (!err && hosts && hosts.length > 0) {
                 self.connect(hosts[0]);
             }
@@ -314,7 +314,7 @@ self.connect = function (options) {
     }
 
     /*
-	  Compute modelsets for this model (so commands which are possible on this model are allowed)
+      Compute modelsets for this model (so commands which are possible on this model are allowed)
       Note that this is not an exact match, model only has to be part of the modelname
     */
     Object.keys(MODELSETS).forEach(function (set) {
@@ -327,65 +327,65 @@ self.connect = function (options) {
 
     self.emit('debug', util.format("INFO (connecting) Connecting to %s:%s (model: %s)", config.host, config.port, config.model));
 
-	// Reconnect if we have previously connected
+    // Reconnect if we have previously connected
     if (typeof eiscp !== 'undefined') {
-		eiscp.connect(connection_properties);
-		return;
+        eiscp.connect(connection_properties);
+        return;
     }
 
-	// Connecting the first time
-	eiscp = net.connect(connection_properties);
+    // Connecting the first time
+    eiscp = net.connect(connection_properties);
 
-	eiscp.
-	on('connect', function () {
+    eiscp.
+        on('connect', function () {
 
-		self.is_connected = true;
-		self.emit('debug', util.format("INFO (connected) Connected to %s:%s (model: %s)", config.host, config.port, config.model));
-		self.emit('connect', config.host, config.port, config.model);
-	}).
+            self.is_connected = true;
+            self.emit('debug', util.format("INFO (connected) Connected to %s:%s (model: %s)", config.host, config.port, config.model));
+            self.emit('connect', config.host, config.port, config.model);
+        }).
 
-	on('close', function () {
+        on('close', function () {
 
-		self.is_connected = false;
-		self.emit('debug', util.format("INFO (disconnected) Disconnected from %s:%s", config.host, config.port));
-		self.emit('close', config.host, config.port);
+            self.is_connected = false;
+            self.emit('debug', util.format("INFO (disconnected) Disconnected from %s:%s", config.host, config.port));
+            self.emit('close', config.host, config.port);
 
-		if (config.reconnect) {
+            if (config.reconnect) {
 
-			setTimeout(self.connect, config.reconnect_sleep * 1000);
-		}
-	}).
+                setTimeout(self.connect, config.reconnect_sleep * 1000);
+            }
+        }).
 
-	on('error', function (err) {
+        on('error', function (err) {
 
-		self.emit('error', util.format("ERROR (server_error) Server error on %s:%s - %s", config.host, config.port, err));
-		eiscp.destroy();
-	}).
+            self.emit('error', util.format("ERROR (server_error) Server error on %s:%s - %s", config.host, config.port, err));
+            eiscp.destroy();
+        }).
 
-	on('data', function (data) {
+        on('data', function (data) {
 
-		var iscp_message = eiscp_packet_extract(data),
-			result = iscp_to_command(iscp_message);
+            var iscp_message = eiscp_packet_extract(data),
+                result = iscp_to_command(iscp_message);
 
-		result.iscp_command = iscp_message;
-        result.host  = config.host;
-        result.port  = config.port;
-        result.model = config.model;
+            result.iscp_command = iscp_message;
+            result.host = config.host;
+            result.port = config.port;
+            result.model = config.model;
 
-		self.emit('debug', util.format("DEBUG (received_data) Received data from %s:%s - %j", config.host, config.port, result));
-		self.emit('data', result);
+            self.emit('debug', util.format("DEBUG (received_data) Received data from %s:%s - %j", config.host, config.port, result));
+            self.emit('data', result);
 
-		// If the command is supported we emit it as well
-		if (typeof result.command !== 'undefined') {
-			if (Array.isArray(result.command)) {
-				result.command.forEach(function (cmd) {
-					self.emit(cmd, result.argument);
-				});
-			} else {
-				self.emit(result.command, result.argument);
-			}
-		}
-	});
+            // If the command is supported we emit it as well
+            if (typeof result.command !== 'undefined') {
+                if (Array.isArray(result.command)) {
+                    result.command.forEach(function (cmd) {
+                        self.emit(cmd, result.argument);
+                    });
+                } else {
+                    self.emit(result.command, result.argument);
+                }
+            }
+        });
 };
 
 self.close = self.disconnect = function () {
@@ -398,7 +398,7 @@ self.close = self.disconnect = function () {
 send_queue = async.queue(function (data, callback) {
     /*
       Syncronous queue which sends commands to device
-	  callback(bool error, string error_message)
+      callback(bool error, string error_message)
     */
     if (self.is_connected) {
 
