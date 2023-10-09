@@ -475,10 +475,19 @@ self.get_command = function (command, callback) {
         command = parts[1];
     }
 
+    const description = COMMANDS[zone][COMMAND_MAPPINGS[zone][command]].description;
+
     async.each(Object.keys(VALUE_MAPPINGS[zone][COMMAND_MAPPINGS[zone][command]]), function (val, cb) {
         result.push(val);
         cb();
     }, function (err) {
-        callback(err, result);
+        if (err) {
+            callback(err, result);
+        } else {
+            callback(err, {
+                description,
+                arguments: result
+            });
+        }
     });
 };

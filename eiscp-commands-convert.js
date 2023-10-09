@@ -76,7 +76,7 @@ try {
     result.command_mappings = command_mappings;
     result.value_mappings = value_mappings;
 
-    fs.writeFile('eiscp-commands.json', JSON.stringify(result), function (err) {
+    fs.writeFile('eiscp-commands.json', JSON.stringify(result, null, 2), function (err) {
         if (err) { return console.log(err); }
 
         console.log('eiscp-commands.json created!');
