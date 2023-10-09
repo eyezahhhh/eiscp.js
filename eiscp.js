@@ -62,7 +62,7 @@ function iscp_to_command(iscp_message) {
       Transform a low-level ISCP message to a high-level command
     */
     var command = iscp_message.slice(0, 3),
-        value = iscp_message.slice(3),
+        value = iscp_message.slice(3).replace(/[\u0000-\u001F\u007F-\u009F]/g, ""),
         result = {};
 
     Object.keys(COMMANDS).forEach(function (zone) {
@@ -70,6 +70,8 @@ function iscp_to_command(iscp_message) {
         if (typeof COMMANDS[zone][command] !== 'undefined') {
 
             var zone_cmd = COMMANDS[zone][command];
+
+            self.emit('debug', util.format('DEBUG (iscp_to_command) Zone: %s | Command: %s | Argument: %s', zone, zone_cmd.name, value));
 
             result.command = zone_cmd.name;
 
