@@ -3,7 +3,7 @@
 /*
     Script that converts eiscp-commands.yaml to eiscp-commands.json
 */
-require('js-yaml');
+const yaml = require('js-yaml');
 
 var fs = require('fs'),
     command_mappings = {},
@@ -18,8 +18,8 @@ var fs = require('fs'),
     result = { 'commands': {} };
 
 try {
+    doc = yaml.load(fs.readFileSync('./eiscp-commands.yaml', "utf-8"));
 
-    doc = require('./eiscp-commands.yaml');
     result.modelsets = doc.modelsets;
     delete doc.modelsets;
 
